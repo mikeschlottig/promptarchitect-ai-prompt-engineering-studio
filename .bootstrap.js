@@ -81,7 +81,8 @@ function runSetupCommands() {
     "bun add react-markdown@^9.0.1",
     "bun add react-syntax-highlighter@^15.5.0",
     "bun add react-speech-recognition@^3.10.0",
-    "bun add regenerator-runtime"
+    "bun add regenerator-runtime",
+    "bun add react-syntax-highlighter"
 ];
     
     if (commands.length === 0) {
