@@ -51,9 +51,12 @@ export class ChatAgent extends Agent<Env, ChatState> {
     } else {
       this.chatHandler?.updateModel(activeModel);
     }
-    const userMessage = createMessage('user', message.trim());
-    // Truncate history to manage context window for long structured prompts
-    const history = this.state.messages.slice(-10);
+    // Check if this is a direct execution request from the frontend
+    const isDirect = message.startsWith('direct:true\n');
+    const processedMessage = isDirect ? message.replace('direct:true\n', '') : message;
+    const userMessage = createMessage('user', processedMessage.trim());
+    // Increased context window for architecting complex workflows
+    const history = this.state.messages.slice(-15);
     this.setState({
       ...this.state,
       messages: [...this.state.messages, userMessage],
@@ -69,7 +72,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
           try {
             this.setState({ ...this.state, streamingMessage: '' });
             const response = await this.chatHandler!.processMessage(
-              message,
+              processedMessage,
               history,
               (chunk: string) => {
                 this.setState({
@@ -95,7 +98,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
         })();
         return createStreamResponse(readable);
       }
-      const response = await this.chatHandler.processMessage(message, history);
+      const response = await this.chatHandler.processMessage(processedMessage, history);
       const assistantMessage = createMessage('assistant', response.content, response.toolCalls);
       this.setState({
         ...this.state,

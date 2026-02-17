@@ -8,6 +8,7 @@ interface Settings {
 interface PromptData {
   input: string;
   output: string;
+  directOutput: string;
 }
 export type ViewType = 'workspace' | 'library' | 'compare';
 interface ArchitectState {
@@ -40,6 +41,7 @@ export const useStore = create<ArchitectState>((set) => ({
   promptData: {
     input: '',
     output: '',
+    directOutput: '',
   },
   activeView: 'workspace',
   currentSessionId: null,
@@ -60,7 +62,7 @@ export const useStore = create<ArchitectState>((set) => ({
   setActiveFrameworkId: (activeFrameworkId) => set({ activeFrameworkId }),
   toggleStar: (id) => set((state) => {
     const isStarred = state.starredIds.includes(id);
-    const newStarred = isStarred 
+    const newStarred = isStarred
       ? state.starredIds.filter(sid => sid !== id)
       : [...state.starredIds, id];
     localStorage.setItem('starred_prompts', JSON.stringify(newStarred));
