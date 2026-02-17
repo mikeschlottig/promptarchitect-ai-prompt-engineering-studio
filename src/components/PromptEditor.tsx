@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -6,10 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStore } from '@/lib/store';
 import { chatService, MODELS } from '@/lib/chat';
 import { OPTIMIZER_SYSTEM_PROMPT } from '@/lib/optimizers';
-import { Wand2, Copy, Check, Save, Sparkles } from 'lucide-react';
+import { Wand2, Copy, Check, Save, Sparkles, LayoutPanelLeft, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { toast } from 'sonner';
 import { VoiceControls } from './VoiceControls';
+import { FrameworkSelector } from './FrameworkSelector';
+import { cn } from '@/lib/utils';
 export function PromptEditor() {
   const input = useStore((s) => s.promptData.input);
   const output = useStore((s) => s.promptData.output);
@@ -19,9 +23,12 @@ export function PromptEditor() {
   const setSettings = useStore((s) => s.setSettings);
   const settings = useStore((s) => s.settings);
   const setSessions = useStore((s) => s.setSessions);
-  const [isOptimizing, setIsOptimizing] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
-  // Sync editor with active session data
+  const setActiveView = useStore((s) => s.setActiveView);
+  const starredIds = useStore((s) => s.starredIds);
+  const toggleStar = useStore((s) => s.toggleStar);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const isStarred = currentSessionId ? starredIds.includes(currentSessionId) : false;
   useEffect(() => {
     if (currentSessionId) {
       const loadSessionData = async () => {
@@ -32,7 +39,7 @@ export function PromptEditor() {
             const lastUser = [...msgs].reverse().find(m => m.role === 'user');
             const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
             setPromptData({
-              input: lastUser?.content.replace(OPTIMIZER_SYSTEM_PROMPT, '').trim() || '',
+              input: lastUser?.content.replace(OPTIMIZER_SYSTEM_PROMPT, '').trim() || input,
               output: lastAssistant?.content || ''
             });
           }
@@ -73,36 +80,38 @@ export function PromptEditor() {
     setTimeout(() => setCopied(false), 2000);
     toast.info('Copied to clipboard');
   };
-  const handleSave = () => {
-    if (!output) return;
-    toast.success('Saved to library');
-  };
   return (
-    <div className="h-[calc(100vh-12rem)] border rounded-xl overflow-hidden bg-background shadow-soft">
+    <div className="h-[calc(100vh-14rem)] border rounded-xl overflow-hidden bg-background shadow-soft">
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={45} minSize={30}>
           <div className="h-full flex flex-col p-6 gap-4 border-r">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Draft Input</h2>
-              <div className="flex items-center gap-2">
-                <VoiceControls onTranscript={(text) => setPromptData({ input: input + (input ? " " : "") + text })} />
-                <Select value={model} onValueChange={(val) => setSettings({ ...settings, model: val })}>
-                  <SelectTrigger className="h-8 w-40 text-xs">
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODELS.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleOptimize} disabled={isOptimizing || !input} size="sm" className="gap-2 h-8 px-4 font-semibold">
-                  <Wand2 className="w-3.5 h-3.5" />
-                  {isOptimizing ? 'Thinking...' : 'Optimize'}
-                </Button>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Draft Input</h2>
+                <div className="flex items-center gap-2">
+                  <VoiceControls onTranscript={(text) => setPromptData({ input: input + (input ? " " : "") + text })} />
+                  <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setActiveView('compare')}>
+                    <LayoutPanelLeft className="w-3.5 h-3.5" /> Compare
+                  </Button>
+                  <Select value={model} onValueChange={(val) => setSettings({ ...settings, model: val })}>
+                    <SelectTrigger className="h-8 w-36 text-xs">
+                      <SelectValue placeholder="Model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODELS.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleOptimize} disabled={isOptimizing || !input} size="sm" className="gap-2 h-8 px-4 font-semibold bg-indigo-600 hover:bg-indigo-700">
+                    <Wand2 className="w-3.5 h-3.5" />
+                    {isOptimizing ? 'Thinking...' : 'Optimize'}
+                  </Button>
+                </div>
               </div>
+              <FrameworkSelector />
             </div>
             <Textarea
               placeholder="Paste your rough instructions, goals, or context here..."
-              className="flex-1 resize-none bg-secondary/10 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/40"
+              className="flex-1 resize-none bg-secondary/10 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/40 mt-2"
               value={input}
               onChange={(e) => setPromptData({ input: e.target.value })}
             />
@@ -115,8 +124,13 @@ export function PromptEditor() {
               <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Architected Result</h2>
               {output && (
                 <div className="flex gap-2">
-                   <Button variant="outline" size="sm" className="h-8 gap-2" onClick={handleSave}>
-                    <Save className="w-3.5 h-3.5" /> Save
+                   <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={cn("h-8 gap-2", isStarred && "text-yellow-500 border-yellow-500/50 bg-yellow-500/10")} 
+                    onClick={() => currentSessionId && toggleStar(currentSessionId)}
+                  >
+                    <Star className={cn("w-3.5 h-3.5", isStarred && "fill-yellow-500")} /> Star
                   </Button>
                   <Button variant="outline" size="sm" className="h-8 gap-2" onClick={copyToClipboard}>
                     {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -125,9 +139,33 @@ export function PromptEditor() {
                 </div>
               )}
             </div>
-            <div className="flex-1 overflow-auto bg-background rounded-lg border border-border/50 p-6 prose prose-sm dark:prose-invert max-w-none shadow-sm">
+            <div className="flex-1 overflow-auto bg-background rounded-lg border border-border/50 p-6 shadow-sm">
               {output ? (
-                <ReactMarkdown>{output}</ReactMarkdown>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown
+                    components={{
+                      code({ node, inline, className, children, ...props }: any) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            style={vscDarkPlus}
+                            language={match[1]}
+                            PreTag="div"
+                            {...props}
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}
+                  >
+                    {output}
+                  </ReactMarkdown>
+                </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 text-center space-y-4">
                   <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center">

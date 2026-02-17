@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from "react";
-import { PlusCircle, Library, Settings, Sparkles, History, Trash2 } from "lucide-react";
+import { PlusCircle, Library, Settings, Sparkles, History, Trash2, LayoutPanelLeft, Star } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +15,7 @@ import {
 import { useStore } from "@/lib/store";
 import { chatService } from "@/lib/chat";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 export function AppSidebar(): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const setActiveView = useStore((s) => s.setActiveView);
@@ -23,6 +24,8 @@ export function AppSidebar(): JSX.Element {
   const sessions = useStore((s) => s.sessions);
   const setSessions = useStore((s) => s.setSessions);
   const setPromptData = useStore((s) => s.setPromptData);
+  const starredIds = useStore((s) => s.starredIds);
+  const starredSessions = sessions.filter(s => starredIds.includes(s.id));
   const fetchSessions = useCallback(async () => {
     try {
       const res = await chatService.listSessions();
@@ -60,9 +63,7 @@ export function AppSidebar(): JSX.Element {
       const res = await chatService.deleteSession(id);
       if (res.success) {
         fetchSessions();
-        if (currentSessionId === id) {
-          setCurrentSessionId(null);
-        }
+        if (currentSessionId === id) setCurrentSessionId(null);
         toast.success("Session deleted");
       }
     } catch (err) {
@@ -73,12 +74,12 @@ export function AppSidebar(): JSX.Element {
     <Sidebar className="border-r border-border/50">
       <SidebarHeader className="border-b border-border/50 px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
             <Sparkles className="size-5" />
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold leading-none">Architect</span>
-            <span className="text-2xs text-muted-foreground">Prompt Studio</span>
+            <span className="text-2xs text-muted-foreground font-mono">BETA</span>
           </div>
         </div>
       </SidebarHeader>
@@ -86,28 +87,52 @@ export function AppSidebar(): JSX.Element {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton 
-                onClick={handleNewPrompt}
-                tooltip="New Prompt"
-              >
-                <PlusCircle /> <span>New Prompt</span>
+              <SidebarMenuButton onClick={handleNewPrompt} className="text-indigo-600 font-semibold">
+                <PlusCircle className="size-4" /> <span>New Workspace</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton 
-                onClick={() => setActiveView("library")}
-                isActive={activeView === "library"}
-                tooltip="Library"
-              >
-                <Library /> <span>Library</span>
+              <SidebarMenuButton onClick={() => setActiveView("workspace")} isActive={activeView === "workspace"}>
+                <Sparkles className="size-4" /> <span>Editor</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setActiveView("compare")} isActive={activeView === "compare"}>
+                <LayoutPanelLeft className="size-4" /> <span>Comparison</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setActiveView("library")} isActive={activeView === "library"}>
+                <Library className="size-4" /> <span>Library</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
+        {starredSessions.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center gap-2">
+              <Star className="size-3 fill-yellow-500 text-yellow-500" /> Favorites
+            </SidebarGroupLabel>
+            <SidebarMenu>
+              {starredSessions.map((session) => (
+                <SidebarMenuItem key={session.id}>
+                  <SidebarMenuButton
+                    onClick={() => handleSelectSession(session.id)}
+                    isActive={currentSessionId === session.id}
+                    className="truncate"
+                  >
+                    <History className="size-4" />
+                    <span className="truncate">{session.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
         <SidebarGroup>
           <SidebarGroupLabel>Recent History</SidebarGroupLabel>
           <SidebarMenu>
-            {sessions.map((session) => (
+            {sessions.slice(0, 10).map((session) => (
               <SidebarMenuItem key={session.id}>
                 <SidebarMenuButton
                   onClick={() => handleSelectSession(session.id)}
@@ -122,21 +147,16 @@ export function AppSidebar(): JSX.Element {
                 </SidebarMenuAction>
               </SidebarMenuItem>
             ))}
-            {sessions.length === 0 && (
-              <div className="px-4 py-2 text-xs text-muted-foreground italic">
-                No recent prompts
-              </div>
-            )}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t border-border/50 p-4">
         <div className="flex flex-col gap-2">
            <SidebarMenuButton size="sm">
-              <Settings className="size-4" /> <span>Settings</span>
+              <Settings className="size-4" /> <span>App Settings</span>
            </SidebarMenuButton>
            <div className="px-2 text-[10px] text-muted-foreground/60">
-             v1.0.0-beta
+             Build v1.0.4-phase4
            </div>
         </div>
       </SidebarFooter>

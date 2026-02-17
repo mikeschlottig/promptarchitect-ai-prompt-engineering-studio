@@ -4,7 +4,7 @@ import { chatService, MODELS } from '@/lib/chat';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Play, Loader2, Copy, Check } from 'lucide-react';
+import { Play, Sparkles, Loader2, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -61,16 +61,12 @@ export function ComparisonView() {
         <div className="flex-1 border rounded-xl overflow-hidden bg-background shadow-soft">
           <ResizablePanelGroup direction="horizontal">
             {comparisonModels.map((modelId, idx) => (
-              <React.Fragment key={`${modelId}-${idx}`}>
-                <ResizablePanel 
-                  id={`comparison-panel-${idx}`}
-                  order={idx}
-                  defaultSize={100 / comparisonModels.length}
-                >
+              <React.Fragment key={modelId}>
+                <ResizablePanel defaultSize={100 / comparisonModels.length}>
                   <div className="h-full flex flex-col">
                     <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
-                      <Select
-                        value={modelId}
+                      <Select 
+                        value={modelId} 
                         onValueChange={(val) => {
                           const newModels = [...comparisonModels];
                           newModels[idx] = val;
@@ -81,7 +77,7 @@ export function ComparisonView() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {MODELS.map(m => <SelectItem key={`${m.id}-${idx}`} value={m.id}>{m.name}</SelectItem>)}
+                          {MODELS.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       {results[modelId] && (
@@ -130,7 +126,7 @@ export function ComparisonView() {
                     </div>
                   </div>
                 </ResizablePanel>
-                {idx < comparisonModels.length - 1 && <ResizableHandle withHandle key={`handle-${idx}`} />}
+                {idx < comparisonModels.length - 1 && <ResizableHandle withHandle />}
               </React.Fragment>
             ))}
           </ResizablePanelGroup>

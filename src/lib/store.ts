@@ -9,7 +9,7 @@ interface PromptData {
   input: string;
   output: string;
 }
-type ViewType = 'workspace' | 'library';
+export type ViewType = 'workspace' | 'library' | 'compare';
 interface ArchitectState {
   settings: Settings;
   sidebarOpen: boolean;
@@ -17,12 +17,18 @@ interface ArchitectState {
   activeView: ViewType;
   currentSessionId: string | null;
   sessions: SessionInfo[];
+  starredIds: string[];
+  comparisonModels: string[];
+  activeFrameworkId: string | null;
   setSettings: (settings: Settings) => void;
   setSidebarOpen: (open: boolean) => void;
   setPromptData: (data: Partial<PromptData>) => void;
   setActiveView: (view: ViewType) => void;
   setCurrentSessionId: (id: string | null) => void;
   setSessions: (sessions: SessionInfo[]) => void;
+  setComparisonModels: (models: string[]) => void;
+  setActiveFrameworkId: (id: string | null) => void;
+  toggleStar: (id: string) => void;
 }
 export const useStore = create<ArchitectState>((set) => ({
   settings: {
@@ -38,6 +44,9 @@ export const useStore = create<ArchitectState>((set) => ({
   activeView: 'workspace',
   currentSessionId: null,
   sessions: [],
+  starredIds: JSON.parse(localStorage.getItem('starred_prompts') || '[]'),
+  comparisonModels: ['google-ai-studio/gemini-2.0-flash', 'google-ai-studio/gemini-1.5-flash'],
+  activeFrameworkId: null,
   setSettings: (settings) => set({ settings }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setPromptData: (data) =>
@@ -47,4 +56,14 @@ export const useStore = create<ArchitectState>((set) => ({
   setActiveView: (activeView) => set({ activeView }),
   setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
   setSessions: (sessions) => set({ sessions }),
+  setComparisonModels: (comparisonModels) => set({ comparisonModels }),
+  setActiveFrameworkId: (activeFrameworkId) => set({ activeFrameworkId }),
+  toggleStar: (id) => set((state) => {
+    const isStarred = state.starredIds.includes(id);
+    const newStarred = isStarred 
+      ? state.starredIds.filter(sid => sid !== id)
+      : [...state.starredIds, id];
+    localStorage.setItem('starred_prompts', JSON.stringify(newStarred));
+    return { starredIds: newStarred };
+  }),
 }));
