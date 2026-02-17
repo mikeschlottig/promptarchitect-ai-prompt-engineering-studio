@@ -31,26 +31,41 @@ export class ChatHandler {
   }> {
     const messages = this.buildConversationMessages(message, conversationHistory);
     const toolDefinitions = await getToolDefinitions();
-    if (onChunk) {
-      const stream = await this.client.chat.completions.create({
+    try {
+      if (onChunk) {
+        const stream = await this.client.chat.completions.create({
+          model: this.model,
+          messages,
+          tools: toolDefinitions,
+          tool_choice: 'auto',
+          max_completion_tokens: 32768,
+          stream: true,
+        });
+        return this.handleStreamResponse(stream, message, conversationHistory, onChunk);
+      }
+      const completion = await this.client.chat.completions.create({
         model: this.model,
         messages,
         tools: toolDefinitions,
         tool_choice: 'auto',
-        max_completion_tokens: 16000,
-        stream: true,
+        max_tokens: 32768,
+        stream: false
       });
-      return this.handleStreamResponse(stream, message, conversationHistory, onChunk);
+      return this.handleNonStreamResponse(completion, message, conversationHistory);
+    } catch (error: any) {
+      console.error('OpenAI Completion Error:', error);
+      const msg = error?.message || String(error);
+      if (msg.includes('context_length_exceeded') || msg.includes('too many tokens')) {
+        throw new Error('provider:context_overflow');
+      }
+      if (msg.includes('rate_limit') || error?.status === 429) {
+        throw new Error('provider:rate_limited');
+      }
+      if (msg.includes('invalid_model') || msg.includes('model_not_found')) {
+        throw new Error('provider:invalid_model');
+      }
+      throw error;
     }
-    const completion = await this.client.chat.completions.create({
-      model: this.model,
-      messages,
-      tools: toolDefinitions,
-      tool_choice: 'auto',
-      max_tokens: 16000,
-      stream: false
-    });
-    return this.handleNonStreamResponse(completion, message, conversationHistory);
   }
   private async handleStreamResponse(
     stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
@@ -60,39 +75,34 @@ export class ChatHandler {
   ) {
     let fullContent = '';
     const accumulatedToolCalls: ChatCompletionMessageFunctionToolCall[] = [];
-    try {
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
-        if (delta?.content) {
-          fullContent += delta.content;
-          onChunk(delta.content);
-        }
-        if (delta?.tool_calls) {
-          for (let i = 0; i < delta.tool_calls.length; i++) {
-            const deltaToolCall = delta.tool_calls[i];
-            if (!accumulatedToolCalls[i]) {
-              accumulatedToolCalls[i] = {
-                id: deltaToolCall.id || `tool_${Date.now()}_${i}`,
-                type: 'function',
-                function: {
-                  name: deltaToolCall.function?.name || '',
-                  arguments: deltaToolCall.function?.arguments || ''
-                }
-              };
-            } else {
-              if (deltaToolCall.function?.name && !accumulatedToolCalls[i].function.name) {
-                accumulatedToolCalls[i].function.name = deltaToolCall.function.name;
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) {
+        fullContent += delta.content;
+        onChunk(delta.content);
+      }
+      if (delta?.tool_calls) {
+        for (let i = 0; i < delta.tool_calls.length; i++) {
+          const deltaToolCall = delta.tool_calls[i];
+          if (!accumulatedToolCalls[i]) {
+            accumulatedToolCalls[i] = {
+              id: deltaToolCall.id || `tool_${Date.now()}_${i}`,
+              type: 'function',
+              function: {
+                name: deltaToolCall.function?.name || '',
+                arguments: deltaToolCall.function?.arguments || ''
               }
-              if (deltaToolCall.function?.arguments) {
-                accumulatedToolCalls[i].function.arguments += deltaToolCall.function.arguments;
-              }
+            };
+          } else {
+            if (deltaToolCall.function?.name && !accumulatedToolCalls[i].function.name) {
+              accumulatedToolCalls[i].function.name = deltaToolCall.function.name;
+            }
+            if (deltaToolCall.function?.arguments) {
+              accumulatedToolCalls[i].function.arguments += deltaToolCall.function.arguments;
             }
           }
         }
       }
-    } catch (error) {
-      console.error('Stream processing error:', error);
-      throw new Error('Stream processing failed');
     }
     if (accumulatedToolCalls.length > 0) {
       const executedTools = await this.executeToolCalls(accumulatedToolCalls);
@@ -171,16 +181,14 @@ export class ChatHandler {
           tool_call_id: openAiToolCalls[index]?.id || result.id
         }))
       ],
-      max_tokens: 16000
+      max_tokens: 32768
     });
     return followUpCompletion.choices[0]?.message?.content || 'Tool results processed successfully.';
   }
   private buildConversationMessages(userMessage: string, history: Message[]) {
-    // If user message contains specific engineering headers, we provide a minimal system prompt
-    // to prevent "double instruction" or conflicting personas.
-    const isEngineered = userMessage.includes('You are a world-class Prompt Engineer') || 
+    const isEngineered = userMessage.includes('You are a world-class Prompt Engineer') ||
                         userMessage.includes('USER INPUT:');
-    const systemPrompt = isEngineered 
+    const systemPrompt = isEngineered
       ? 'Follow the prompt engineering instructions provided in the user message precisely.'
       : 'You are a helpful AI assistant that helps users build and deploy web applications. You provide clear, concise guidance on development, deployment, and troubleshooting. Keep responses practical and actionable.';
     return [

@@ -51,14 +51,11 @@ export class ChatAgent extends Agent<Env, ChatState> {
     } else {
       this.chatHandler?.updateModel(activeModel);
     }
-    // Flag detection logic
     const isDirect = message.startsWith('direct:true\n');
     const isAssistantChat = message.startsWith('assistant-chat: ');
-    // Strip internal flags for LLM processing
     let processedMessage = message;
     if (isDirect) processedMessage = processedMessage.replace('direct:true\n', '');
     if (isAssistantChat) processedMessage = processedMessage.replace('assistant-chat: ', '');
-    // We store the original message (with tags) in history for frontend filtering
     const userMessage = createMessage('user', message.trim());
     const history = this.state.messages.slice(-15);
     this.setState({
@@ -93,9 +90,15 @@ export class ChatAgent extends Agent<Env, ChatState> {
               isProcessing: false,
               streamingMessage: ''
             });
-          } catch (error) {
-            console.error('Streaming error:', error);
-            writer.write(encoder.encode('Error processing request.'));
+          } catch (error: any) {
+            console.error('Streaming error caught in agent:', error);
+            const errorMsg = error?.message || 'Error processing request.';
+            // If it's a specific provider error, we pass it as a special token
+            if (errorMsg.startsWith('provider:')) {
+              writer.write(encoder.encode(`[ERROR:${errorMsg}]`));
+            } else {
+              writer.write(encoder.encode('I encountered an issue processing your request.'));
+            }
           } finally {
             writer.close();
           }
@@ -110,9 +113,14 @@ export class ChatAgent extends Agent<Env, ChatState> {
         isProcessing: false
       });
       return Response.json({ success: true, data: this.state });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Non-stream error caught in agent:', error);
+      const errorMsg = error?.message || API_RESPONSES.PROCESSING_ERROR;
       this.setState({ ...this.state, isProcessing: false });
-      return Response.json({ success: false, error: API_RESPONSES.PROCESSING_ERROR }, { status: 500 });
+      return Response.json({ 
+        success: false, 
+        error: errorMsg.startsWith('provider:') ? errorMsg : API_RESPONSES.PROCESSING_ERROR 
+      }, { status: 500 });
     }
   }
   private handleClearMessages(): Response {

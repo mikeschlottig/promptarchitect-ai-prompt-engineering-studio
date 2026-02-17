@@ -6,13 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStore } from '@/lib/store';
 import { chatService, MODELS } from '@/lib/chat';
 import { OPTIMIZER_SYSTEM_PROMPT } from '@/lib/optimizers';
-import { Wand2, Copy, Check, Sparkles, LayoutPanelLeft, Star, Send, Trash2 } from 'lucide-react';
+import { Wand2, Copy, Check, Sparkles, LayoutPanelLeft, Star, Send, Trash2, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { toast } from 'sonner';
 import { VoiceControls } from './VoiceControls';
 import { FrameworkSelector } from './FrameworkSelector';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 export function PromptEditor() {
   const input = useStore((s) => s.promptData.input);
@@ -31,6 +32,7 @@ export function PromptEditor() {
   const [isSendingDirectly, setIsSendingDirectly] = useState(false);
   const [copiedType, setCopiedType] = useState<'optimized' | 'direct' | null>(null);
   const isStarred = currentSessionId ? starredIds.includes(currentSessionId) : false;
+  const CHAR_LIMIT = 3000;
   useEffect(() => {
     if (currentSessionId) {
       const loadSessionData = async () => {
@@ -38,16 +40,13 @@ export function PromptEditor() {
           const res = await chatService.getMessages();
           if (res.success && res.data) {
             const msgs = res.data.messages;
-            // Filter out internal assistant chat messages to find relevant draft state
             const relevantHistory = msgs.filter(m => !m.content.startsWith('assistant-chat: '));
             const lastUser = [...relevantHistory].reverse().find(m => m.role === 'user');
             const lastAssistant = [...relevantHistory].reverse().find(m => m.role === 'assistant');
             let recoveredInput = lastUser?.content || '';
-            // Strip optimization preamble
             if (recoveredInput.includes(OPTIMIZER_SYSTEM_PROMPT)) {
               recoveredInput = recoveredInput.split('USER INPUT:')[1] || recoveredInput.replace(OPTIMIZER_SYSTEM_PROMPT, '');
             }
-            // Strip direct execution flag
             recoveredInput = recoveredInput.replace(/^direct:true\n/, '');
             setPromptData({
               input: recoveredInput.trim(),
@@ -62,43 +61,54 @@ export function PromptEditor() {
       loadSessionData();
     }
   }, [currentSessionId, setPromptData]);
+  const validateAndCleanInput = (rawInput: string) => {
+    if (rawInput.length > CHAR_LIMIT) {
+      toast.info("Input truncated to 3000 characters for optimal performance.");
+      return rawInput.slice(0, CHAR_LIMIT);
+    }
+    return rawInput;
+  };
   const handleOptimize = async () => {
     if (!input.trim()) return;
+    const cleanedInput = validateAndCleanInput(input);
+    if (cleanedInput !== input) setPromptData({ input: cleanedInput });
     setIsOptimizing(true);
     setPromptData({ output: '' });
     try {
-      const fullPrompt = `${OPTIMIZER_SYSTEM_PROMPT}\n\nUSER INPUT: ${input}`;
+      const fullPrompt = `${OPTIMIZER_SYSTEM_PROMPT}\n\nUSER INPUT: ${cleanedInput}`;
       let streamedOutput = '';
       await chatService.sendMessage(fullPrompt, model, (chunk) => {
         streamedOutput += chunk;
         setPromptData({ output: streamedOutput });
       });
       if (currentSessionId) {
-        const title = input.slice(0, 30) + (input.length > 30 ? '...' : '');
+        const title = cleanedInput.slice(0, 30) + (cleanedInput.length > 30 ? '...' : '');
         await chatService.updateSessionTitle(currentSessionId, `Optimized: ${title}`);
         const res = await chatService.listSessions();
         if (res.success && res.data) setSessions(res.data);
       }
       toast.success('Prompt optimized!');
     } catch (err) {
-      toast.error('Failed to optimize prompt');
+      // Error is handled in chatService.sendMessage with toast
     } finally {
       setIsOptimizing(false);
     }
   };
   const handleSendDirectly = async () => {
     if (!input.trim()) return;
+    const cleanedInput = validateAndCleanInput(input);
+    if (cleanedInput !== input) setPromptData({ input: cleanedInput });
     setIsSendingDirectly(true);
     setPromptData({ directOutput: '' });
     try {
       let streamedOutput = '';
-      await chatService.sendMessage(`direct:true\n${input}`, model, (chunk) => {
+      await chatService.sendMessage(`direct:true\n${cleanedInput}`, model, (chunk) => {
         streamedOutput += chunk;
         setPromptData({ directOutput: streamedOutput });
       });
       toast.success('Direct response received!');
     } catch (err) {
-      toast.error('Failed to get direct response');
+      // Error is handled in chatService.sendMessage with toast
     } finally {
       setIsSendingDirectly(false);
     }
@@ -133,11 +143,17 @@ export function PromptEditor() {
       </ReactMarkdown>
     </div>
   );
+  const charCount = input.length;
+  const getCounterColor = () => {
+    if (charCount >= 2500) return 'text-destructive font-bold';
+    if (charCount >= 2000) return 'text-orange-500 font-medium';
+    return 'text-muted-foreground';
+  };
   return (
     <div className="h-[calc(100vh-16rem)] border rounded-xl overflow-hidden bg-background shadow-soft">
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={45} minSize={30}>
-          <div className="h-full flex flex-col p-4 md:p-6 gap-4 border-r overflow-hidden">
+          <div className="h-full flex flex-col p-4 md:p-6 gap-4 border-r overflow-hidden relative">
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Draft Input</h2>
@@ -169,12 +185,29 @@ export function PromptEditor() {
               </div>
               <FrameworkSelector />
             </div>
-            <Textarea
-              placeholder="Paste your rough instructions, goals, or context here..."
-              className="flex-1 resize-none bg-secondary/5 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/30 mt-2"
-              value={input}
-              onChange={(e) => setPromptData({ input: e.target.value })}
-            />
+            <div className="flex-1 relative flex flex-col mt-2">
+              <Textarea
+                placeholder="Paste your rough instructions, goals, or context here..."
+                className="flex-1 resize-none bg-secondary/5 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/30"
+                value={input}
+                onChange={(e) => setPromptData({ input: e.target.value })}
+              />
+              <div className="absolute bottom-0 right-0 p-2 flex items-center gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={cn("text-[10px] tabular-nums px-2 py-1 rounded bg-background/80 border border-border/50 flex items-center gap-1.5 cursor-help", getCounterColor())}>
+                        {charCount} / {CHAR_LIMIT}
+                        <Info className="w-3 h-3" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs max-w-[200px]">
+                      <p>Draft limit: {CHAR_LIMIT} characters. For longer content, use frameworks to structure your thoughts into chunks.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />

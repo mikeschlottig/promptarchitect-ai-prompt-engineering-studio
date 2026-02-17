@@ -1,4 +1,5 @@
 import type { Message, ChatState, ToolCall, WeatherResult, MCPResult, ErrorResult, SessionInfo } from '../../worker/types';
+import { toast } from 'sonner';
 export interface ChatResponse {
   success: boolean;
   data?: ChatState;
@@ -16,6 +17,22 @@ class ChatService {
     this.sessionId = crypto.randomUUID();
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
+  private parseAndToastError(errorStr?: string) {
+    if (!errorStr) return;
+    if (errorStr === 'provider:context_overflow') {
+      toast.error("The input is too long for this model. Try switching to Gemini Pro or shortening your instructions.");
+      return;
+    }
+    if (errorStr === 'provider:rate_limited') {
+      toast.error("The AI provider is busy. Please wait a moment or use your own API key in settings.");
+      return;
+    }
+    if (errorStr === 'provider:invalid_model') {
+      toast.error("The selected model is unavailable or incorrect. Please check your settings.");
+      return;
+    }
+    toast.error("Failed to send message. Please check your connection or try again.");
+  }
   async sendMessage(
     message: string,
     model?: string,
@@ -27,7 +44,11 @@ class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, model, stream: !!onChunk }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        this.parseAndToastError(errJson.error);
+        throw new Error(errJson.error || `HTTP ${response.status}`);
+      }
       if (onChunk && response.body) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -36,6 +57,12 @@ class ChatService {
             const { done, value } = await reader.read();
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
+            // Detection of embedded error tokens in stream
+            if (chunk.includes('[ERROR:provider:')) {
+              const errorCode = chunk.match(/\[ERROR:(provider:[a-z_]+)\]/)?.[1];
+              this.parseAndToastError(errorCode);
+              throw new Error(errorCode);
+            }
             if (chunk) onChunk(chunk);
           }
         } finally {
@@ -43,10 +70,18 @@ class ChatService {
         }
         return { success: true };
       }
-      return await response.json();
-    } catch (error) {
+      const result = await response.json();
+      if (!result.success) {
+        this.parseAndToastError(result.error);
+      }
+      return result;
+    } catch (error: any) {
       console.error('Failed to send message:', error);
-      return { success: false, error: 'Failed to send message' };
+      // If toast wasn't already triggered by parseAndToastError
+      if (!error.message?.startsWith('provider:')) {
+        toast.error("Network error: Failed to reach the AI agent.");
+      }
+      return { success: false, error: error.message };
     }
   }
   async getMessages(): Promise<ChatResponse> {
