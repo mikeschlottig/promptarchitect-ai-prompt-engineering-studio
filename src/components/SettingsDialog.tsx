@@ -17,9 +17,20 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const settings = useStore((s) => s.settings);
+  const model = useStore((s) => s.settings.model);
+  const apiKey = useStore((s) => s.settings.apiKey);
+  const baseUrl = useStore((s) => s.settings.baseUrl);
   const setSettings = useStore((s) => s.setSettings);
-  const [localSettings, setLocalSettings] = React.useState(settings);
+  const [localSettings, setLocalSettings] = React.useState({
+    model,
+    apiKey,
+    baseUrl
+  });
+  React.useEffect(() => {
+    if (open) {
+      setLocalSettings({ model, apiKey, baseUrl });
+    }
+  }, [open, model, apiKey, baseUrl]);
   const handleSave = async () => {
     setSettings(localSettings);
     try {

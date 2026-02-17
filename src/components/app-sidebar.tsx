@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { PlusCircle, Library, Settings, Sparkles, History, Trash2 } from "lucide-react";
 import {
   Sidebar,
@@ -15,7 +15,6 @@ import {
 import { useStore } from "@/lib/store";
 import { chatService } from "@/lib/chat";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 export function AppSidebar(): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const setActiveView = useStore((s) => s.setActiveView);
@@ -24,15 +23,19 @@ export function AppSidebar(): JSX.Element {
   const sessions = useStore((s) => s.sessions);
   const setSessions = useStore((s) => s.setSessions);
   const setPromptData = useStore((s) => s.setPromptData);
-  const fetchSessions = async () => {
-    const res = await chatService.listSessions();
-    if (res.success && res.data) {
-      setSessions(res.data);
+  const fetchSessions = useCallback(async () => {
+    try {
+      const res = await chatService.listSessions();
+      if (res.success && res.data) {
+        setSessions(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch sessions", err);
     }
-  };
+  }, [setSessions]);
   useEffect(() => {
     fetchSessions();
-  }, []);
+  }, [fetchSessions]);
   const handleNewPrompt = async () => {
     const id = crypto.randomUUID();
     const res = await chatService.createSession("New Prompt", id);
@@ -49,18 +52,21 @@ export function AppSidebar(): JSX.Element {
     setCurrentSessionId(sessionId);
     chatService.switchSession(sessionId);
     setActiveView("workspace");
-    // In a real app, we'd fetch the messages for this session and populate the editor
-    toast.info("Switched session");
+    toast.info("Switched workspace");
   };
   const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const res = await chatService.deleteSession(id);
-    if (res.success) {
-      fetchSessions();
-      if (currentSessionId === id) {
-        setCurrentSessionId(null);
+    try {
+      const res = await chatService.deleteSession(id);
+      if (res.success) {
+        fetchSessions();
+        if (currentSessionId === id) {
+          setCurrentSessionId(null);
+        }
+        toast.success("Session deleted");
       }
-      toast.success("Session deleted");
+    } catch (err) {
+      toast.error("Failed to delete session");
     }
   };
   return (

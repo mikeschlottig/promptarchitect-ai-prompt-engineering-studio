@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStore } from '@/lib/store';
 import { chatService, MODELS } from '@/lib/chat';
 import { OPTIMIZER_SYSTEM_PROMPT } from '@/lib/optimizers';
-import { Wand2, Copy, Check, Save, Share2 } from 'lucide-react';
+import { Wand2, Copy, Check, Save, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { VoiceControls } from './VoiceControls';
@@ -15,11 +15,34 @@ export function PromptEditor() {
   const output = useStore((s) => s.promptData.output);
   const setPromptData = useStore((s) => s.setPromptData);
   const currentSessionId = useStore((s) => s.currentSessionId);
-  const settings = useStore((s) => s.settings);
+  const model = useStore((s) => s.settings.model);
   const setSettings = useStore((s) => s.setSettings);
+  const settings = useStore((s) => s.settings);
   const setSessions = useStore((s) => s.setSessions);
   const [isOptimizing, setIsOptimizing] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  // Sync editor with active session data
+  useEffect(() => {
+    if (currentSessionId) {
+      const loadSessionData = async () => {
+        try {
+          const res = await chatService.getMessages();
+          if (res.success && res.data) {
+            const msgs = res.data.messages;
+            const lastUser = [...msgs].reverse().find(m => m.role === 'user');
+            const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
+            setPromptData({
+              input: lastUser?.content.replace(OPTIMIZER_SYSTEM_PROMPT, '').trim() || '',
+              output: lastAssistant?.content || ''
+            });
+          }
+        } catch (err) {
+          console.error("Failed to load session messages", err);
+        }
+      };
+      loadSessionData();
+    }
+  }, [currentSessionId, setPromptData]);
   const handleOptimize = async () => {
     if (!input.trim()) return;
     setIsOptimizing(true);
@@ -27,12 +50,11 @@ export function PromptEditor() {
     try {
       const fullPrompt = `${OPTIMIZER_SYSTEM_PROMPT}\n\nUSER INPUT: ${input}`;
       let streamedOutput = '';
-      await chatService.sendMessage(fullPrompt, settings.model, (chunk) => {
+      await chatService.sendMessage(fullPrompt, model, (chunk) => {
         streamedOutput += chunk;
         setPromptData({ output: streamedOutput });
       });
       if (currentSessionId) {
-        // Auto-update title based on input
         const title = input.slice(0, 30) + (input.length > 30 ? '...' : '');
         await chatService.updateSessionTitle(currentSessionId, `Optimized: ${title}`);
         const res = await chatService.listSessions();
@@ -51,7 +73,7 @@ export function PromptEditor() {
     setTimeout(() => setCopied(false), 2000);
     toast.info('Copied to clipboard');
   };
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!output) return;
     toast.success('Saved to library');
   };
@@ -64,7 +86,7 @@ export function PromptEditor() {
               <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Draft Input</h2>
               <div className="flex items-center gap-2">
                 <VoiceControls onTranscript={(text) => setPromptData({ input: input + (input ? " " : "") + text })} />
-                <Select value={settings.model} onValueChange={(val) => setSettings({ ...settings, model: val })}>
+                <Select value={model} onValueChange={(val) => setSettings({ ...settings, model: val })}>
                   <SelectTrigger className="h-8 w-40 text-xs">
                     <SelectValue placeholder="Select model" />
                   </SelectTrigger>

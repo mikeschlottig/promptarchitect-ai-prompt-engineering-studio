@@ -4,7 +4,7 @@ import { chatService } from '@/lib/chat';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { History, Search, Trash2, ExternalLink, Calendar } from 'lucide-react';
+import { History, Search, Trash2, ExternalLink, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 export function LibraryView() {
@@ -13,7 +13,7 @@ export function LibraryView() {
   const setCurrentSessionId = useStore((s) => s.setCurrentSessionId);
   const setActiveView = useStore((s) => s.setActiveView);
   const [search, setSearch] = useState("");
-  const filteredSessions = sessions.filter(s => 
+  const filteredSessions = sessions.filter(s =>
     s.title.toLowerCase().includes(search.toLowerCase())
   );
   const handleOpen = (id: string) => {
@@ -22,34 +22,43 @@ export function LibraryView() {
     setActiveView('workspace');
   };
   const handleDelete = async (id: string) => {
-    const res = await chatService.deleteSession(id);
-    if (res.success) {
-      const updated = await chatService.listSessions();
-      if (updated.success && updated.data) setSessions(updated.data);
-      toast.success("Prompt deleted from library");
+    try {
+      const res = await chatService.deleteSession(id);
+      if (res.success) {
+        const updated = await chatService.listSessions();
+        if (updated.success && updated.data) setSessions(updated.data);
+        toast.success("Prompt deleted from library");
+      }
+    } catch (err) {
+      toast.error("Failed to delete prompt");
     }
   };
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12">
-      <div className="flex flex-col gap-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="py-8 md:py-10 lg:py-12 flex flex-col gap-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Prompt Library</h1>
             <p className="text-muted-foreground">Browse and manage your architected instructions.</p>
           </div>
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search library..." 
-              className="pl-10" 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search library..."
+                className="pl-10"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Button onClick={() => setActiveView('workspace')} className="gap-2">
+              <Plus className="h-4 w-4" /> New Prompt
+            </Button>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSessions.map((session) => (
-            <Card key={session.id} className="group hover:border-primary/50 transition-colors">
+            <Card key={session.id} className="group hover:border-primary/50 transition-colors bg-card overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-2">
                   <CardTitle className="text-lg line-clamp-1">{session.title}</CardTitle>
@@ -64,7 +73,7 @@ export function LibraryView() {
               </CardHeader>
               <CardContent className="pb-3">
                 <div className="h-20 text-xs text-muted-foreground line-clamp-4 bg-muted/30 p-2 rounded border italic">
-                  Preview of the optimized prompt content would appear here based on session message history...
+                  Draft instructions: {session.title.replace('Optimized: ', '')}
                 </div>
               </CardContent>
               <CardFooter>
@@ -79,7 +88,7 @@ export function LibraryView() {
             <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
               <History className="h-10 w-10 mb-4 opacity-20" />
               <p>No prompts found in your library.</p>
-              <Button variant="link" onClick={() => setSearch("")}>Clear search</Button>
+              {search && <Button variant="link" onClick={() => setSearch("")}>Clear search</Button>}
             </div>
           )}
         </div>

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { chatService } from '@/lib/chat';
 import { cn } from '@/lib/utils';
+import { useStore } from '@/lib/store';
 import ReactMarkdown from 'react-markdown';
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,9 +14,13 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const model = useStore(s => s.settings.model);
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+      }
     }
   }, [messages]);
   const handleSend = async () => {
@@ -26,7 +31,7 @@ export function AIAssistant() {
     setIsTyping(true);
     try {
       let responseContent = '';
-      await chatService.sendMessage(userMsg, undefined, (chunk) => {
+      await chatService.sendMessage(userMsg, model, (chunk) => {
         responseContent += chunk;
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -61,7 +66,7 @@ export function AIAssistant() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
+            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
               <div className="space-y-4">
                 {messages.length === 0 && (
                   <div className="text-center py-8 px-4 text-muted-foreground text-sm">
@@ -85,8 +90,8 @@ export function AIAssistant() {
             </ScrollArea>
             <div className="p-4 border-t bg-muted/50">
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
-                <Input 
-                  placeholder="Ask a question..." 
+                <Input
+                  placeholder="Ask a question..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   className="bg-background text-sm"
