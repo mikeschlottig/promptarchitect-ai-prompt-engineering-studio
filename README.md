@@ -1,6 +1,6 @@
 # Cloudflare Workers AI Chat App
 
-[![Deploy to Cloudflare][cloudflarebutton]]
+[![Deploy to Cloudflare][![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/promptarchitect-ai-prompt-engineering-studio)]
 
 A production-ready, full-stack AI chat application powered by Cloudflare Workers and Agents. Features multi-session conversations, real-time streaming responses, tool calling (web search, weather, MCP integration), model switching (Gemini family), and a modern responsive UI.
 
@@ -105,7 +105,7 @@ Deploy to Cloudflare Workers with full SPA support and Durable Objects.
    ```
 3. Custom domain: `wrangler pages deploy` or Workers asset binding.
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/promptarchitect-ai-prompt-engineering-studio)
 
 ### Production Vars
 Update `wrangler.jsonc`:
