@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -18,20 +17,9 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const model = useStore((s) => s.settings.model);
-  const apiKey = useStore((s) => s.settings.apiKey);
-  const baseUrl = useStore((s) => s.settings.baseUrl);
+  const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
-  const [localSettings, setLocalSettings] = React.useState({
-    model,
-    apiKey,
-    baseUrl
-  });
-  React.useEffect(() => {
-    if (open) {
-      setLocalSettings({ model, apiKey, baseUrl });
-    }
-  }, [open, model, apiKey, baseUrl]);
+  const [localSettings, setLocalSettings] = React.useState(settings);
   const handleSave = async () => {
     setSettings(localSettings);
     try {
@@ -51,9 +39,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Provider Settings</DialogTitle>
-          <DialogDescription>
-            Configure your AI provider API keys and model settings for external integrations.
-          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">

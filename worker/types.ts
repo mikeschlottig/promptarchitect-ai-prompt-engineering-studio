@@ -32,12 +32,15 @@ export interface ToolCall {
 
 export interface ChatState {
   messages: Message[];
-  sessionId: string;
-  isProcessing: boolean;
+  sessionId: string;  isProcessing: boolean;
   model: string;
   streamingMessage?: string;
+  providerConfig?: {
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
 }
-
 export interface SessionInfo {
   id: string;
   title: string;

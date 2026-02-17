@@ -187,6 +187,26 @@ class ChatService {
       return { success: false, error: 'Failed to update model' };
     }
   }
+
+  async updateConfig(baseUrl: string, apiKey: string, model: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerConfig: { baseUrl, apiKey, model }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'Failed to update configuration' };
+    }
+  }
 }
 
 export const chatService = new ChatService();

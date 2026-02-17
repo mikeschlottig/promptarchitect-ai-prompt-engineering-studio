@@ -18,7 +18,18 @@ export class ChatHandler {
       baseURL: aiGatewayUrl,
       apiKey: apiKey
     });
-    console.log("BASE URL", aiGatewayUrl);
+    console.log("BASE URL", aiGatewayUrl);    this.model = model;
+  }
+  /**
+   * Dynamically update client configuration
+   */
+  updateConfig(baseUrl: string, apiKey: string, model: string) {
+    if (baseUrl && apiKey) {
+      this.client = new OpenAI({
+        baseURL: baseUrl,
+        apiKey: apiKey
+      });
+    }
     this.model = model;
   }
 

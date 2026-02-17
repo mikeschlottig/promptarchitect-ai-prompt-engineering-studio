@@ -47,10 +47,12 @@ export class ChatAgent extends Agent<Env, ChatState> {
         return this.handleGetMessages();
       }
       
-      if (method === 'POST' && url.pathname === '/chat') {
-        return this.handleChatMessage(await request.json());
+      if (method === 'POST' && url.pathname === '/chat') {        return this.handleChatMessage(await request.json());
       }
-      
+      if (method === 'POST' && url.pathname === '/config') {
+        return this.handleConfigUpdate(await request.json());
+      }
+
       if (method === 'DELETE' && url.pathname === '/clear') {
         return this.handleClearMessages();
       }
@@ -97,8 +99,15 @@ export class ChatAgent extends Agent<Env, ChatState> {
       }, { status: 400 });
     }
 
-    // Update model if provided
-    if (model && model !== this.state.model) {
+    // Dynamically update model if provided in body or state
+    const activeModel = model || this.state.model;
+    if (this.state.providerConfig) {
+      this.chatHandler?.updateConfig(
+        this.state.providerConfig.baseUrl,
+        this.state.providerConfig.apiKey,
+        this.state.providerConfig.model
+      );
+    } else if (model && model !== this.state.model) {
       this.setState({ ...this.state, model });
       this.chatHandler?.updateModel(model);
     }
@@ -236,9 +245,18 @@ export class ChatAgent extends Agent<Env, ChatState> {
     this.setState({ ...this.state, model });
     this.chatHandler?.updateModel(model);
     
-    return Response.json({ 
-      success: true, 
-      data: this.state 
+    return Response.json({
+      success: true,
+      data: this.state
     });
+  }
+
+  private handleConfigUpdate(body: { providerConfig: ChatState['providerConfig'] }): Response {
+    const { providerConfig } = body;
+    this.setState({ ...this.state, providerConfig });
+    if (providerConfig) {
+      this.chatHandler?.updateConfig(providerConfig.baseUrl, providerConfig.apiKey, providerConfig.model);
+    }
+    return Response.json({ success: true, data: this.state });
   }
 }
