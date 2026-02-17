@@ -51,11 +51,15 @@ export class ChatAgent extends Agent<Env, ChatState> {
     } else {
       this.chatHandler?.updateModel(activeModel);
     }
-    // Check if this is a direct execution request from the frontend
+    // Flag detection logic
     const isDirect = message.startsWith('direct:true\n');
-    const processedMessage = isDirect ? message.replace('direct:true\n', '') : message;
-    const userMessage = createMessage('user', processedMessage.trim());
-    // Increased context window for architecting complex workflows
+    const isAssistantChat = message.startsWith('assistant-chat: ');
+    // Strip internal flags for LLM processing
+    let processedMessage = message;
+    if (isDirect) processedMessage = processedMessage.replace('direct:true\n', '');
+    if (isAssistantChat) processedMessage = processedMessage.replace('assistant-chat: ', '');
+    // We store the original message (with tags) in history for frontend filtering
+    const userMessage = createMessage('user', message.trim());
     const history = this.state.messages.slice(-15);
     this.setState({
       ...this.state,

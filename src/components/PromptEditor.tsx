@@ -38,10 +38,19 @@ export function PromptEditor() {
           const res = await chatService.getMessages();
           if (res.success && res.data) {
             const msgs = res.data.messages;
-            const lastUser = [...msgs].reverse().find(m => m.role === 'user');
-            const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
+            // Filter out internal assistant chat messages to find relevant draft state
+            const relevantHistory = msgs.filter(m => !m.content.startsWith('assistant-chat: '));
+            const lastUser = [...relevantHistory].reverse().find(m => m.role === 'user');
+            const lastAssistant = [...relevantHistory].reverse().find(m => m.role === 'assistant');
+            let recoveredInput = lastUser?.content || '';
+            // Strip optimization preamble
+            if (recoveredInput.includes(OPTIMIZER_SYSTEM_PROMPT)) {
+              recoveredInput = recoveredInput.split('USER INPUT:')[1] || recoveredInput.replace(OPTIMIZER_SYSTEM_PROMPT, '');
+            }
+            // Strip direct execution flag
+            recoveredInput = recoveredInput.replace(/^direct:true\n/, '');
             setPromptData({
-              input: lastUser?.content.replace(OPTIMIZER_SYSTEM_PROMPT, '').trim() || '',
+              input: recoveredInput.trim(),
               output: lastAssistant?.content || '',
               directOutput: ''
             });
@@ -125,36 +134,36 @@ export function PromptEditor() {
     </div>
   );
   return (
-    <div className="h-[calc(100vh-14rem)] border rounded-xl overflow-hidden bg-background shadow-soft">
+    <div className="h-[calc(100vh-16rem)] border rounded-xl overflow-hidden bg-background shadow-soft">
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={45} minSize={30}>
-          <div className="h-full flex flex-col p-6 gap-4 border-r">
+          <div className="h-full flex flex-col p-4 md:p-6 gap-4 border-r overflow-hidden">
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Draft Input</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <VoiceControls onTranscript={(text) => setPromptData({ input: input + (input ? " " : "") + text })} />
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={handleClear} title="Clear All">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                   <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setActiveView('compare')}>
-                    <LayoutPanelLeft className="w-3.5 h-3.5" /> Compare
+                    <LayoutPanelLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Compare</span>
                   </Button>
                   <Select value={model} onValueChange={(val) => setSettings({ ...settings, model: val })}>
-                    <SelectTrigger className="h-8 w-36 text-xs">
+                    <SelectTrigger className="h-8 w-24 sm:w-36 text-xs">
                       <SelectValue placeholder="Model" />
                     </SelectTrigger>
                     <SelectContent>
                       {MODELS.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Button onClick={handleSendDirectly} disabled={isSendingDirectly || isOptimizing || !input} size="sm" className="gap-2 h-8 px-4 font-semibold bg-emerald-600 hover:bg-emerald-700">
+                  <Button onClick={handleSendDirectly} disabled={isSendingDirectly || isOptimizing || !input} size="sm" className="gap-2 h-8 px-3 sm:px-4 font-semibold bg-emerald-600 hover:bg-emerald-700">
                     <Send className="w-3.5 h-3.5" />
-                    {isSendingDirectly ? 'Sending...' : 'Send'}
+                    <span className="hidden xs:inline">{isSendingDirectly ? '...' : 'Send'}</span>
                   </Button>
-                  <Button onClick={handleOptimize} disabled={isOptimizing || isSendingDirectly || !input} size="sm" className="gap-2 h-8 px-4 font-semibold bg-indigo-600 hover:bg-indigo-700">
+                  <Button onClick={handleOptimize} disabled={isOptimizing || isSendingDirectly || !input} size="sm" className="gap-2 h-8 px-3 sm:px-4 font-semibold bg-indigo-600 hover:bg-indigo-700">
                     <Wand2 className="w-3.5 h-3.5" />
-                    {isOptimizing ? 'Thinking...' : 'Optimize'}
+                    <span className="hidden xs:inline">{isOptimizing ? '...' : 'Optimize'}</span>
                   </Button>
                 </div>
               </div>
@@ -162,7 +171,7 @@ export function PromptEditor() {
             </div>
             <Textarea
               placeholder="Paste your rough instructions, goals, or context here..."
-              className="flex-1 resize-none bg-secondary/10 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/40 mt-2"
+              className="flex-1 resize-none bg-secondary/5 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/30 mt-2"
               value={input}
               onChange={(e) => setPromptData({ input: e.target.value })}
             />
@@ -172,7 +181,7 @@ export function PromptEditor() {
         <ResizablePanel defaultSize={55} minSize={30}>
           <ResizablePanelGroup direction="vertical">
             <ResizablePanel defaultSize={50} minSize={20}>
-              <div className="h-full flex flex-col p-6 gap-4 bg-accent/5 overflow-hidden">
+              <div className="h-full flex flex-col p-4 md:p-6 gap-4 bg-accent/5 overflow-hidden">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Architected Result</h2>
                   <div className="flex gap-2">
@@ -188,7 +197,7 @@ export function PromptEditor() {
                 </div>
                 <div className="flex-1 overflow-auto bg-background rounded-lg border border-border/50 p-4 shadow-sm">
                   {output ? renderMarkdown(output) : (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 text-center space-y-2">
+                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 text-center space-y-2">
                       <Sparkles className="w-5 h-5" />
                       <p className="text-xs">Optimized prompt will appear here.</p>
                     </div>
@@ -198,7 +207,7 @@ export function PromptEditor() {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={50} minSize={20}>
-              <div className="h-full flex flex-col p-6 gap-4 bg-secondary/5 overflow-hidden">
+              <div className="h-full flex flex-col p-4 md:p-6 gap-4 bg-secondary/5 overflow-hidden">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Direct Response</h2>
                   {directOutput && (
@@ -209,7 +218,7 @@ export function PromptEditor() {
                 </div>
                 <div className="flex-1 overflow-auto bg-background rounded-lg border border-border/50 p-4 shadow-sm">
                   {directOutput ? renderMarkdown(directOutput) : (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 text-center space-y-2">
+                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 text-center space-y-2">
                       <Send className="w-5 h-5" />
                       <p className="text-xs">Raw model response will appear here.</p>
                     </div>

@@ -27,11 +27,14 @@ export function AIAssistant() {
     if (!message.trim() || isTyping) return;
     const userMsg = message;
     setMessage('');
+    // UI update
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setIsTyping(true);
     try {
       let responseContent = '';
-      await chatService.sendMessage(userMsg, model, (chunk) => {
+      // Internal prefix to distinguish this as a support chat, not a prompt draft
+      const internalMsg = `assistant-chat: ${userMsg}`;
+      await chatService.sendMessage(internalMsg, model, (chunk) => {
         responseContent += chunk;
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -57,7 +60,7 @@ export function AIAssistant() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="mb-4 w-80 md:w-96 h-[500px] bg-card border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
-            <div className="p-4 border-b bg-primary text-primary-foreground flex items-center justify-between">
+            <div className="p-4 border-b bg-indigo-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 <span className="font-semibold text-sm">Architect Assistant</span>
@@ -75,7 +78,7 @@ export function AIAssistant() {
                 )}
                 {messages.map((msg, i) => (
                   <div key={i} className={cn("flex flex-col max-w-[85%]", msg.role === 'user' ? "ml-auto items-end" : "items-start")}>
-                    <div className={cn("p-3 rounded-2xl text-sm", msg.role === 'user' ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-muted rounded-tl-none prose prose-sm dark:prose-invert")}>
+                    <div className={cn("p-3 rounded-2xl text-sm", msg.role === 'user' ? "bg-indigo-600 text-white rounded-tr-none" : "bg-muted rounded-tl-none prose prose-sm dark:prose-invert")}>
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   </div>
@@ -106,7 +109,7 @@ export function AIAssistant() {
       </AnimatePresence>
       <Button
         size="icon"
-        className="h-14 w-14 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all"
+        className="h-14 w-14 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all bg-indigo-600 text-white"
         onClick={() => setIsOpen(!isOpen)}
       >
         <MessageSquare className={cn("h-6 w-6 transition-transform", isOpen ? "rotate-90 scale-0" : "scale-100")} />
