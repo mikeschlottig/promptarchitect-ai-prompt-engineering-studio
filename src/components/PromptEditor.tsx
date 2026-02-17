@@ -38,20 +38,30 @@ export function PromptEditor() {
       const loadSessionData = async () => {
         try {
           const res = await chatService.getMessages();
-          if (res.success && res.data) {
+          if (res.success && res.data?.messages) {
             const msgs = res.data.messages;
-            const relevantHistory = msgs.filter(m => !m.content.startsWith('assistant-chat: '));
-            const lastUser = [...relevantHistory].reverse().find(m => m.role === 'user');
-            const lastAssistant = [...relevantHistory].reverse().find(m => m.role === 'assistant');
-            let recoveredInput = lastUser?.content || '';
-            if (recoveredInput.includes(OPTIMIZER_SYSTEM_PROMPT)) {
-              recoveredInput = recoveredInput.split('USER INPUT:')[1] || recoveredInput.replace(OPTIMIZER_SYSTEM_PROMPT, '');
+            const relevantHistory = msgs.filter(m => !m.content.includes('assistant-chat: '));
+            const lastUserMsg = [...relevantHistory].reverse().find(m => m.role === 'user');
+            const lastAssistantMsg = [...relevantHistory].reverse().find(m => m.role === 'assistant');
+            let recoveredInput = lastUserMsg?.content || '';
+            let recoveredOutput = '';
+            let recoveredDirect = '';
+            const isDirect = recoveredInput.startsWith('direct:true\n');
+            const isOptimized = recoveredInput.includes(OPTIMIZER_SYSTEM_PROMPT);
+            if (isOptimized) {
+              recoveredInput = recoveredInput.split('USER INPUT:')[1]?.trim() || recoveredInput.replace(OPTIMIZER_SYSTEM_PROMPT, '').trim();
+              recoveredOutput = lastAssistantMsg?.content || '';
+            } else if (isDirect) {
+              recoveredInput = recoveredInput.replace('direct:true\n', '').trim();
+              recoveredDirect = lastAssistantMsg?.content || '';
+            } else {
+              recoveredInput = recoveredInput.trim();
+              recoveredOutput = lastAssistantMsg?.content || '';
             }
-            recoveredInput = recoveredInput.replace(/^direct:true\n/, '');
             setPromptData({
-              input: recoveredInput.trim(),
-              output: lastAssistant?.content || '',
-              directOutput: ''
+              input: recoveredInput,
+              output: recoveredOutput,
+              directOutput: recoveredDirect
             });
           }
         } catch (err) {
@@ -63,7 +73,7 @@ export function PromptEditor() {
   }, [currentSessionId, setPromptData]);
   const validateAndCleanInput = (rawInput: string) => {
     if (rawInput.length > CHAR_LIMIT) {
-      toast.info("Input truncated to 3000 characters for optimal performance.");
+      toast.info("Input truncated for optimal performance.");
       return rawInput.slice(0, CHAR_LIMIT);
     }
     return rawInput;
@@ -71,9 +81,8 @@ export function PromptEditor() {
   const handleOptimize = async () => {
     if (!input.trim()) return;
     const cleanedInput = validateAndCleanInput(input);
-    if (cleanedInput !== input) setPromptData({ input: cleanedInput });
     setIsOptimizing(true);
-    setPromptData({ output: '' });
+    setPromptData({ output: '', directOutput: '' });
     try {
       const fullPrompt = `${OPTIMIZER_SYSTEM_PROMPT}\n\nUSER INPUT: ${cleanedInput}`;
       let streamedOutput = '';
@@ -97,9 +106,8 @@ export function PromptEditor() {
   const handleSendDirectly = async () => {
     if (!input.trim()) return;
     const cleanedInput = validateAndCleanInput(input);
-    if (cleanedInput !== input) setPromptData({ input: cleanedInput });
     setIsSendingDirectly(true);
-    setPromptData({ directOutput: '' });
+    setPromptData({ directOutput: '', output: '' });
     try {
       let streamedOutput = '';
       await chatService.sendMessage(`direct:true\n${cleanedInput}`, model, (chunk) => {
@@ -202,7 +210,7 @@ export function PromptEditor() {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs max-w-[200px]">
-                      <p>Draft limit: {CHAR_LIMIT} characters. For longer content, use frameworks to structure your thoughts into chunks.</p>
+                      <p>Draft limit: {CHAR_LIMIT} characters.</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

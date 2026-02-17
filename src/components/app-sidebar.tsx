@@ -15,7 +15,6 @@ import {
 import { useStore } from "@/lib/store";
 import { chatService } from "@/lib/chat";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 export function AppSidebar(): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const setActiveView = useStore((s) => s.setActiveView);
@@ -25,6 +24,7 @@ export function AppSidebar(): JSX.Element {
   const setSessions = useStore((s) => s.setSessions);
   const setPromptData = useStore((s) => s.setPromptData);
   const starredIds = useStore((s) => s.starredIds);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const starredSessions = sessions.filter(s => starredIds.includes(s.id));
   const fetchSessions = useCallback(async () => {
     try {
@@ -44,7 +44,7 @@ export function AppSidebar(): JSX.Element {
     const res = await chatService.createSession("New Prompt", id);
     if (res.success) {
       setCurrentSessionId(id);
-      setPromptData({ input: "", output: "" });
+      setPromptData({ input: "", output: "", directOutput: "" });
       setActiveView("workspace");
       chatService.switchSession(id);
       fetchSessions();
@@ -152,11 +152,11 @@ export function AppSidebar(): JSX.Element {
       </SidebarContent>
       <SidebarFooter className="border-t border-border/50 p-4">
         <div className="flex flex-col gap-2">
-           <SidebarMenuButton size="sm">
+           <SidebarMenuButton size="sm" onClick={() => setSettingsOpen(true)}>
               <Settings className="size-4" /> <span>App Settings</span>
            </SidebarMenuButton>
            <div className="px-2 text-[10px] text-muted-foreground/60">
-             Build v1.0.4-phase4
+             Build v1.0.4-phase6
            </div>
         </div>
       </SidebarFooter>

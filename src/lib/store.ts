@@ -14,6 +14,7 @@ export type ViewType = 'workspace' | 'library' | 'compare';
 interface ArchitectState {
   settings: Settings;
   sidebarOpen: boolean;
+  settingsOpen: boolean;
   promptData: PromptData;
   activeView: ViewType;
   currentSessionId: string | null;
@@ -23,6 +24,7 @@ interface ArchitectState {
   activeFrameworkId: string | null;
   setSettings: (settings: Settings) => void;
   setSidebarOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
   setPromptData: (data: Partial<PromptData>) => void;
   setActiveView: (view: ViewType) => void;
   setCurrentSessionId: (id: string | null) => void;
@@ -38,6 +40,7 @@ export const useStore = create<ArchitectState>((set) => ({
     model: 'google-ai-studio/gemini-2.0-flash',
   },
   sidebarOpen: true,
+  settingsOpen: false,
   promptData: {
     input: '',
     output: '',
@@ -51,6 +54,7 @@ export const useStore = create<ArchitectState>((set) => ({
   activeFrameworkId: null,
   setSettings: (settings) => set({ settings }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setPromptData: (data) =>
     set((state) => ({
       promptData: { ...state.promptData, ...data },

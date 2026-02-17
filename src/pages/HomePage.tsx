@@ -11,8 +11,9 @@ import { useStore } from '@/lib/store';
 import { Settings, Sparkles, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 export function HomePage() {
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const activeView = useStore((s) => s.activeView);
+  const settingsOpen = useStore((s) => s.settingsOpen);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const renderContent = () => {
     switch (activeView) {
       case 'workspace':
@@ -21,7 +22,6 @@ export function HomePage() {
             <div className="py-8 md:py-10 lg:py-12 flex flex-col min-h-screen">
               <header className="mb-8 space-y-2">
                 <div className="flex items-center gap-2 text-indigo-600">
-                  <Sparkles className="h-6 w-6" />
                   <span className="font-bold tracking-tight text-xl">Architect Studio</span>
                   <div className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-[10px] font-bold text-indigo-600 border border-indigo-100 uppercase">
                     <BadgeCheck className="w-3 h-3" /> Pro

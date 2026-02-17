@@ -15,6 +15,28 @@ export function AIAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const model = useStore(s => s.settings.model);
+  const currentSessionId = useStore(s => s.currentSessionId);
+  useEffect(() => {
+    if (isOpen) {
+      const loadAssistantHistory = async () => {
+        try {
+          const res = await chatService.getMessages();
+          if (res.success && res.data?.messages) {
+            const assistantHistory = res.data.messages
+              .filter(m => m.content.includes('assistant-chat: '))
+              .map(m => ({
+                role: m.role as 'user' | 'assistant',
+                content: m.content.replace('assistant-chat: ', '')
+              }));
+            setMessages(assistantHistory);
+          }
+        } catch (err) {
+          console.error("Failed to load assistant history", err);
+        }
+      };
+      loadAssistantHistory();
+    }
+  }, [isOpen, currentSessionId]);
   useEffect(() => {
     if (scrollRef.current) {
       const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -27,12 +49,10 @@ export function AIAssistant() {
     if (!message.trim() || isTyping) return;
     const userMsg = message;
     setMessage('');
-    // UI update
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setIsTyping(true);
     try {
       let responseContent = '';
-      // Internal prefix to distinguish this as a support chat, not a prompt draft
       const internalMsg = `assistant-chat: ${userMsg}`;
       await chatService.sendMessage(internalMsg, model, (chunk) => {
         responseContent += chunk;
