@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,6 @@ interface VoiceControlsProps {
   onTranscript: (text: string) => void;
 }
 export function VoiceControls({ onTranscript }: VoiceControlsProps) {
-  const isMounted = useRef(true);
   const {
     transcript,
     listening,
@@ -17,10 +16,7 @@ export function VoiceControls({ onTranscript }: VoiceControlsProps) {
     isMicrophoneAvailable
   } = useSpeechRecognition();
   useEffect(() => {
-    return () => { isMounted.current = false; };
-  }, []);
-  useEffect(() => {
-    if (!listening && transcript && isMounted.current) {
+    if (!listening && transcript) {
       onTranscript(transcript);
       resetTranscript();
       toast.success("Voice input captured");
@@ -61,7 +57,7 @@ export function VoiceControls({ onTranscript }: VoiceControlsProps) {
         <Mic className="h-4 w-4" />
       )}
       {listening && (
-        <span className="absolute -top-8 right-0 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap z-50">
+        <span className="absolute -top-8 right-0 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap">
           Listening...
         </span>
       )}

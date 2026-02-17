@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { chatService } from '@/lib/chat';
 import { cn } from '@/lib/utils';
-import { useStore } from '@/lib/store';
 import ReactMarkdown from 'react-markdown';
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,35 +13,9 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const model = useStore(s => s.settings.model);
-  const currentSessionId = useStore(s => s.currentSessionId);
-  useEffect(() => {
-    if (isOpen) {
-      const loadAssistantHistory = async () => {
-        try {
-          const res = await chatService.getMessages();
-          if (res.success && res.data?.messages) {
-            const assistantHistory = res.data.messages
-              .filter(m => m.content.includes('assistant-chat: '))
-              .map(m => ({
-                role: m.role as 'user' | 'assistant',
-                content: m.content.replace('assistant-chat: ', '')
-              }));
-            setMessages(assistantHistory);
-          }
-        } catch (err) {
-          console.error("Failed to load assistant history", err);
-        }
-      };
-      loadAssistantHistory();
-    }
-  }, [isOpen, currentSessionId]);
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
-      }
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
   const handleSend = async () => {
@@ -53,8 +26,7 @@ export function AIAssistant() {
     setIsTyping(true);
     try {
       let responseContent = '';
-      const internalMsg = `assistant-chat: ${userMsg}`;
-      await chatService.sendMessage(internalMsg, model, (chunk) => {
+      await chatService.sendMessage(userMsg, undefined, (chunk) => {
         responseContent += chunk;
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -80,7 +52,7 @@ export function AIAssistant() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="mb-4 w-80 md:w-96 h-[500px] bg-card border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
-            <div className="p-4 border-b bg-indigo-600 text-white flex items-center justify-between">
+            <div className="p-4 border-b bg-primary text-primary-foreground flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 <span className="font-semibold text-sm">Architect Assistant</span>
@@ -89,7 +61,7 @@ export function AIAssistant() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
               <div className="space-y-4">
                 {messages.length === 0 && (
                   <div className="text-center py-8 px-4 text-muted-foreground text-sm">
@@ -98,7 +70,7 @@ export function AIAssistant() {
                 )}
                 {messages.map((msg, i) => (
                   <div key={i} className={cn("flex flex-col max-w-[85%]", msg.role === 'user' ? "ml-auto items-end" : "items-start")}>
-                    <div className={cn("p-3 rounded-2xl text-sm", msg.role === 'user' ? "bg-indigo-600 text-white rounded-tr-none" : "bg-muted rounded-tl-none prose prose-sm dark:prose-invert")}>
+                    <div className={cn("p-3 rounded-2xl text-sm", msg.role === 'user' ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-muted rounded-tl-none prose prose-sm dark:prose-invert")}>
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   </div>
@@ -113,8 +85,8 @@ export function AIAssistant() {
             </ScrollArea>
             <div className="p-4 border-t bg-muted/50">
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
-                <Input
-                  placeholder="Ask a question..."
+                <Input 
+                  placeholder="Ask a question..." 
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   className="bg-background text-sm"
@@ -129,7 +101,7 @@ export function AIAssistant() {
       </AnimatePresence>
       <Button
         size="icon"
-        className="h-14 w-14 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all bg-indigo-600 text-white"
+        className="h-14 w-14 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all"
         onClick={() => setIsOpen(!isOpen)}
       >
         <MessageSquare className={cn("h-6 w-6 transition-transform", isOpen ? "rotate-90 scale-0" : "scale-100")} />

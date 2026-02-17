@@ -1,5 +1,5 @@
-import React from "react";
-import { PlusCircle, Library, Settings, Sparkles, History } from "lucide-react";
+import React, { useEffect } from "react";
+import { PlusCircle, Library, Settings, Sparkles, History, Trash2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -10,8 +10,59 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuAction,
 } from "@/components/ui/sidebar";
+import { useStore } from "@/lib/store";
+import { chatService } from "@/lib/chat";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 export function AppSidebar(): JSX.Element {
+  const activeView = useStore((s) => s.activeView);
+  const setActiveView = useStore((s) => s.setActiveView);
+  const currentSessionId = useStore((s) => s.currentSessionId);
+  const setCurrentSessionId = useStore((s) => s.setCurrentSessionId);
+  const sessions = useStore((s) => s.sessions);
+  const setSessions = useStore((s) => s.setSessions);
+  const setPromptData = useStore((s) => s.setPromptData);
+  const fetchSessions = async () => {
+    const res = await chatService.listSessions();
+    if (res.success && res.data) {
+      setSessions(res.data);
+    }
+  };
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+  const handleNewPrompt = async () => {
+    const id = crypto.randomUUID();
+    const res = await chatService.createSession("New Prompt", id);
+    if (res.success) {
+      setCurrentSessionId(id);
+      setPromptData({ input: "", output: "" });
+      setActiveView("workspace");
+      chatService.switchSession(id);
+      fetchSessions();
+      toast.success("New workspace created");
+    }
+  };
+  const handleSelectSession = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    chatService.switchSession(sessionId);
+    setActiveView("workspace");
+    // In a real app, we'd fetch the messages for this session and populate the editor
+    toast.info("Switched session");
+  };
+  const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const res = await chatService.deleteSession(id);
+    if (res.success) {
+      fetchSessions();
+      if (currentSessionId === id) {
+        setCurrentSessionId(null);
+      }
+      toast.success("Session deleted");
+    }
+  };
   return (
     <Sidebar className="border-r border-border/50">
       <SidebarHeader className="border-b border-border/50 px-4 py-4">
@@ -29,20 +80,47 @@ export function AppSidebar(): JSX.Element {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="New Prompt" isActive>
+              <SidebarMenuButton 
+                onClick={handleNewPrompt}
+                tooltip="New Prompt"
+              >
                 <PlusCircle /> <span>New Prompt</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Library">
+              <SidebarMenuButton 
+                onClick={() => setActiveView("library")}
+                isActive={activeView === "library"}
+                tooltip="Library"
+              >
                 <Library /> <span>Library</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="History">
-                <History /> <span>History</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Recent History</SidebarGroupLabel>
+          <SidebarMenu>
+            {sessions.map((session) => (
+              <SidebarMenuItem key={session.id}>
+                <SidebarMenuButton
+                  onClick={() => handleSelectSession(session.id)}
+                  isActive={currentSessionId === session.id}
+                  className="truncate"
+                >
+                  <History className="size-4" />
+                  <span className="truncate">{session.title}</span>
+                </SidebarMenuButton>
+                <SidebarMenuAction onClick={(e) => handleDeleteSession(e, session.id)}>
+                  <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />
+                </SidebarMenuAction>
+              </SidebarMenuItem>
+            ))}
+            {sessions.length === 0 && (
+              <div className="px-4 py-2 text-xs text-muted-foreground italic">
+                No recent prompts
+              </div>
+            )}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

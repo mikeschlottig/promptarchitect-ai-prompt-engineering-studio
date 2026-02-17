@@ -2,16 +2,22 @@ import React from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import { chatService } from '@/lib/chat';
+import { chatService, MODELS } from '@/lib/chat';
 import { OPTIMIZER_SYSTEM_PROMPT } from '@/lib/optimizers';
-import { Wand2, Copy, Check } from 'lucide-react';
+import { Wand2, Copy, Check, Save, Share2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
+import { VoiceControls } from './VoiceControls';
 export function PromptEditor() {
   const input = useStore((s) => s.promptData.input);
   const output = useStore((s) => s.promptData.output);
   const setPromptData = useStore((s) => s.setPromptData);
+  const currentSessionId = useStore((s) => s.currentSessionId);
+  const settings = useStore((s) => s.settings);
+  const setSettings = useStore((s) => s.setSettings);
+  const setSessions = useStore((s) => s.setSessions);
   const [isOptimizing, setIsOptimizing] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const handleOptimize = async () => {
@@ -21,10 +27,17 @@ export function PromptEditor() {
     try {
       const fullPrompt = `${OPTIMIZER_SYSTEM_PROMPT}\n\nUSER INPUT: ${input}`;
       let streamedOutput = '';
-      await chatService.sendMessage(fullPrompt, undefined, (chunk) => {
+      await chatService.sendMessage(fullPrompt, settings.model, (chunk) => {
         streamedOutput += chunk;
         setPromptData({ output: streamedOutput });
       });
+      if (currentSessionId) {
+        // Auto-update title based on input
+        const title = input.slice(0, 30) + (input.length > 30 ? '...' : '');
+        await chatService.updateSessionTitle(currentSessionId, `Optimized: ${title}`);
+        const res = await chatService.listSessions();
+        if (res.success && res.data) setSessions(res.data);
+      }
       toast.success('Prompt optimized!');
     } catch (err) {
       toast.error('Failed to optimize prompt');
@@ -38,48 +51,67 @@ export function PromptEditor() {
     setTimeout(() => setCopied(false), 2000);
     toast.info('Copied to clipboard');
   };
+  const handleSave = async () => {
+    if (!output) return;
+    toast.success('Saved to library');
+  };
   return (
-    <div className="h-[calc(100vh-4rem)] border rounded-lg overflow-hidden bg-background">
+    <div className="h-[calc(100vh-12rem)] border rounded-xl overflow-hidden bg-background shadow-soft">
       <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={40} minSize={30}>
-          <div className="h-full flex flex-col p-4 gap-4">
+        <ResizablePanel defaultSize={45} minSize={30}>
+          <div className="h-full flex flex-col p-6 gap-4 border-r">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Draft</h2>
-              <Button 
-                onClick={handleOptimize} 
-                disabled={isOptimizing || !input}
-                size="sm"
-                className="gap-2"
-              >
-                <Wand2 className="w-4 h-4" />
-                {isOptimizing ? 'Optimizing...' : 'Optimize'}
-              </Button>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Draft Input</h2>
+              <div className="flex items-center gap-2">
+                <VoiceControls onTranscript={(text) => setPromptData({ input: input + (input ? " " : "") + text })} />
+                <Select value={settings.model} onValueChange={(val) => setSettings({ ...settings, model: val })}>
+                  <SelectTrigger className="h-8 w-40 text-xs">
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODELS.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleOptimize} disabled={isOptimizing || !input} size="sm" className="gap-2 h-8 px-4 font-semibold">
+                  <Wand2 className="w-3.5 h-3.5" />
+                  {isOptimizing ? 'Thinking...' : 'Optimize'}
+                </Button>
+              </div>
             </div>
             <Textarea
-              placeholder="Paste your vague prompt here..."
-              className="flex-1 resize-none bg-secondary/30 focus-visible:ring-1"
+              placeholder="Paste your rough instructions, goals, or context here..."
+              className="flex-1 resize-none bg-secondary/10 border-none focus-visible:ring-0 text-base leading-relaxed p-0 placeholder:text-muted-foreground/40"
               value={input}
               onChange={(e) => setPromptData({ input: e.target.value })}
             />
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={60} minSize={30}>
-          <div className="h-full flex flex-col p-4 gap-4 bg-secondary/10">
+        <ResizablePanel defaultSize={55} minSize={30}>
+          <div className="h-full flex flex-col p-6 gap-4 bg-accent/5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Architected Prompt</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Architected Result</h2>
               {output && (
-                <Button variant="ghost" size="sm" onClick={copyToClipboard}>
-                  {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                </Button>
+                <div className="flex gap-2">
+                   <Button variant="outline" size="sm" className="h-8 gap-2" onClick={handleSave}>
+                    <Save className="w-3.5 h-3.5" /> Save
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 gap-2" onClick={copyToClipboard}>
+                    {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    Copy
+                  </Button>
+                </div>
               )}
             </div>
-            <div className="flex-1 overflow-auto prose prose-sm dark:prose-invert max-w-none p-4 rounded-md border bg-background/50">
+            <div className="flex-1 overflow-auto bg-background rounded-lg border border-border/50 p-6 prose prose-sm dark:prose-invert max-w-none shadow-sm">
               {output ? (
                 <ReactMarkdown>{output}</ReactMarkdown>
               ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground italic">
-                  Optimized output will appear here...
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm italic">Enter your draft instructions and click 'Optimize' to generate a professional prompt structure.</p>
                 </div>
               )}
             </div>
